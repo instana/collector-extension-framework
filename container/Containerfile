@@ -1,0 +1,98 @@
+# syntax=docker/dockerfile:1
+
+# -----------------------------------------------------------------------------
+# Stage 1: Build Python wheels and fetch Tini
+# -----------------------------------------------------------------------------
+FROM registry.access.redhat.com/ubi10-minimal AS builder
+
+SHELL ["/bin/bash", "-o", "errexit", "-o", "nounset", "-o", "pipefail", "-c"]
+
+# Python build environment.
+#
+# Although the current runtime dependencies are available as pre-built wheels,
+# this image is intended to serve as a base for customer extensions. Retaining
+# the generic build toolchain allows future extension images to compile Python
+# packages with native extensions if required.
+RUN microdnf install -y --nodocs --setopt=install_weak_deps=0 \
+        python3.12 \
+        python3.12-pip \
+    && microdnf clean all
+
+COPY extension-base/requirements.txt /tmp/requirements.txt
+COPY extension-base/dist/extension_base-*.whl /wheels/
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+RUN pip3.12 install --upgrade pip \
+    && pip3.12 wheel \
+        --wheel-dir /wheels \
+        --no-cache-dir \
+        --no-deps \
+        -r /tmp/requirements.txt
+
+# Fetch static Tini binary.
+ENV TINI_VERSION=v0.19.0
+ADD --chmod=755 https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-static-amd64 /tmp/tini
+
+# -----------------------------------------------------------------------------
+# Stage 2: Runtime image
+# -----------------------------------------------------------------------------
+FROM icr.io/instana-int/int-docker-base-images-local/base-images/base:latest
+
+SHELL ["/bin/bash", "-o", "errexit", "-o", "nounset", "-o", "pipefail", "-c"]
+
+ARG version="1.0.0"
+ARG commit_id="unknown"
+
+RUN microdnf install -y --nodocs --setopt=install_weak_deps=0 \
+        python3.12 \
+        python3.12-pip \
+        python3.12-devel \
+        gcc \
+    && microdnf clean all
+
+COPY --from=builder /tmp/tini /usr/local/bin/tini
+
+COPY --from=builder /wheels /wheels
+
+RUN pip3.12 install \
+        --no-index \
+        --no-cache-dir \
+        /wheels/*.whl \
+    && rm -rf /wheels
+
+# Convenience symlinks
+RUN ln -sf /usr/bin/python3.12 /usr/local/bin/python \
+    && ln -sf /usr/bin/pip3.12 /usr/local/bin/pip
+
+# extension_base is now an installed package — no PYTHONPATH override needed.
+ENV INSTANA_EXTENSION_HOME=/opt/instana/custom-collector \
+    INSTANA_LOG_LEVEL=INFO
+
+COPY --chown=1000:0 --chmod=755 runtime/ \
+    /opt/instana/custom-collector/runtime/
+
+RUN mkdir -p /opt/instana/custom-collector/{config,extensions} \
+    && chown 1000:0 /opt/instana/custom-collector/{config,extensions} \
+    && chmod -R g=u /opt/instana/custom-collector
+
+# Metadata
+LABEL maintainer="Instana Python Tracer Engineers <pythonrubyinstana@ibm.com>" \
+      com.instana.image.version="${version}" \
+      com.instana.commit.id="${commit_id}" \
+      com.instana.component="collector-extension-runtime" \
+      description="Base runtime for Instana Collector Extensions with Python 3.12"
+
+HEALTHCHECK --interval=60s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["/opt/instana/custom-collector/runtime/healthcheck.sh"]
+
+USER instana
+
+WORKDIR /opt/instana/custom-collector
+
+ENTRYPOINT ["/usr/local/bin/tini", "--", "/opt/instana/custom-collector/runtime/entrypoint.sh"]
+
+CMD ["python", "-m", "extension_base"]

@@ -1,0 +1,24 @@
+# syntax=docker/dockerfile:1
+# (c) Copyright IBM Corp. 2026
+#
+# HTTP API Collector Extension image.
+#
+# Build context: repo root
+#
+#   podman build --format docker -f sample-extensions/http-api-extension/Containerfile -t http-api-extension:latest .
+
+FROM icr.io/instana/collector-extension-runtime-python:latest
+
+USER root
+
+RUN pip install \
+        --no-cache-dir \
+        requests
+
+# Copy the HTTP API collection function into the extensions directory.
+COPY --chown=instana:0 sample-extensions/http-api-extension/extension/collect.py \
+    /opt/instana/custom-collector/extensions/collect.py
+
+USER instana
+
+CMD ["python", "/opt/instana/custom-collector/extensions/collect.py"]

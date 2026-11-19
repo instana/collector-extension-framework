@@ -1,0 +1,48 @@
+[project]
+name = "custom-collector-framework"
+version = "1.0.0"
+description = "Instana's Python Custom Collector Framework."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["extension-base"]
+
+[tool.uv.sources]
+extension-base = { workspace = true }
+
+[tool.uv.workspace]
+members = ["base_library/"]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.0",
+    "ruff>=0.15.12",
+]
+
+[tool.ruff]
+# https://docs.astral.sh/ruff/configuration/
+target-version = "py312"
+# In addition to the standard set of exclusions, omit all tests, plus a specific file.
+extend-exclude = [".bob", "bin", ".github"]
+preview = true
+output-format = "concise"
+
+[tool.ruff.lint]
+# https://docs.astral.sh/ruff/rules/
+select = [
+    "E",        # pycodestyle
+    "F",        # Pyflakes
+    "I",        # isort
+    "CPY",      # flake8-copyright
+    "SIM",      # flake8-simplify
+    "FLY",      # flynt (static-join-to-f-string)
+    "UP031",    # printf-string-formatting
+    "UP032",    # f-string
+]
+ignore = ["E501", "I001"]
+
+[tool.ruff.lint.flake8-copyright]
+notice-rgx = "(?i)#\\s?(\\(c\\)\\s+)?Copyright\\s+IBM Corp\\.\\s+(\\d{4}((-|,\\s)\\d{4})?)"
+min-file-size = 1024
+
+# [tool.ruff.format]
+# preview = true

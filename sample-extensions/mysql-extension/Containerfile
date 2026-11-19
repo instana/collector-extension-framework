@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1
+# (c) Copyright IBM Corp. 2026
+#
+# MySQL Collector Extension image.
+#
+# Build context: repo root
+#
+#   podman build --format docker -f sample-extensions/mysql-extension/Containerfile -t mysql-extension:latest .
+
+FROM icr.io/instana/collector-extension-runtime-python:latest
+
+USER root
+
+# Install the MySQL driver and cryptography (required for caching_sha2_password).
+RUN pip install \
+        --no-cache-dir \
+        "pymysql[rsa]>=1.2.0"
+
+# Copy the MySQL collection function into the extensions directory
+COPY --chown=instana:0 sample-extensions/mysql-extension/extension/collect.py \
+    /opt/instana/custom-collector/extensions/collect.py
+
+USER instana
+
+CMD ["python", "/opt/instana/custom-collector/extensions/collect.py"]

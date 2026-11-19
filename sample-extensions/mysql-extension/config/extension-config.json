@@ -1,0 +1,47 @@
+{
+  "extension_id":      "mysql-ext-001",
+  "extension_name":    "mysql-metrics-collector",
+  "extension_version": "0.1.0",
+
+  "configuration": {
+    "log_level": "DEBUG",
+    "interval":  30,
+    "timeout":   5,
+    "endpoints": [
+      {
+        "id":              "mysql-remote",
+        "url":             "mysql-db-metric-collection.e.aivencloud.com",
+        "port":            17652,
+        "credentials_ref": "mysql.remote",
+        "interval":        30,
+        "enabled":         true,
+        "tags": {
+          "db.system":   "mysql",
+          "environment": "remote",
+          "role":        "primary"
+        }
+      },
+      {
+        "id":              "mysql-local",
+        "url":             "host.containers.internal",
+        "port":            3306,
+        "credentials_ref": "mysql.local",
+        "interval":        30,
+        "enabled":         true,
+        "tags": {
+          "db.system":   "mysql",
+          "environment": "local",
+          "role":        "secondary"
+        }
+      }
+    ]
+  },
+
+  "otlp": {
+    "endpoint":    "host.containers.internal:4317",
+    "protocol":    "grpc",
+    "compression": "gzip",
+    "interval":    15,
+    "timeout":     10
+  }
+}
