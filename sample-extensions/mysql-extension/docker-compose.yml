@@ -1,0 +1,29 @@
+# (c) Copyright IBM Corp. 2026
+#
+# Local development compose file for the MySQL extension.
+#
+# Starts only the MySQL database.  Build and run the extension image
+# separately with podman
+
+services:
+
+  mysql:
+    image: public.ecr.aws/docker/library/mysql:8.4
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: testdb
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # Paths are relative to this compose file's directory (sample-extensions/mysql-extension/)
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  mysql_data:
